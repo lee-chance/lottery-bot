@@ -42,6 +42,8 @@ class Lotto645:
         assert type(auth_ctrl) == auth.AuthController
         assert type(cnt) == int and 1 <= cnt <= 5
         assert type(mode) == Lotto645Mode
+        print('cnt', cnt)
+        print('mode', mode)
 
         headers = self._generate_req_headers(auth_ctrl)
         requirements = self._getRequirements(headers)
@@ -117,8 +119,6 @@ class Lotto645:
         soup = BS(
             html, "html5lib"
         )
-        print('soup', soup)
-        print('hi', soup.find("input", id="ROUND_DRAW_DATE"))
         draw_date = soup.find("input", id="ROUND_DRAW_DATE").get('value')
         tlmt_date = soup.find("input", id="WAMT_PAY_TLMT_END_DT").get('value')
 
