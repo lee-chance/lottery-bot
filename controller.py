@@ -64,7 +64,9 @@ def check():
 def buy(): 
     
     load_dotenv() 
-
+    print(os.environ.get('USERNAME'))
+    print(os.environ.get('PASSWORD'))
+    print(os.environ.get('COUNT'))
     username = os.environ.get('USERNAME')
     password = os.environ.get('PASSWORD')
     count = int(os.environ.get('COUNT'))
