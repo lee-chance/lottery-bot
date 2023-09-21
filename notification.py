@@ -71,5 +71,5 @@ class Notification:
             return
 
     def _send_discord_webhook(self, webhook_url: str, message: str) -> None:        
-        payload = { "content": message }
+        payload = { "content": message, "text":message }
         requests.post(webhook_url, json=payload)
