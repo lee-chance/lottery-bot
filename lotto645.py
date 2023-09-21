@@ -44,6 +44,8 @@ class Lotto645:
         assert type(mode) == Lotto645Mode
         print('cnt', cnt)
         print('mode', mode)
+        print(cnt + 1 == 5)
+        print(cnt + 1 == 6)
 
         headers = self._generate_req_headers(auth_ctrl)
         requirements = self._getRequirements(headers)
