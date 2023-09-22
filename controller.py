@@ -33,22 +33,15 @@ def check_winning_win720(authCtrl: auth.AuthController) -> dict:
 
 def send_message(mode: int, lottery_type: int, response: dict, webhook_url: str):
     notify = notification.Notification()
-    print('hi')
     if mode == 0:
-        print('hi 2')
         if lottery_type == 0:
-            print('hi 3')
             notify.send_lotto_winning_message(response, webhook_url)
         else:
-            print('hi 4')
             notify.send_win720_winning_message(response, webhook_url)
     elif mode == 1: 
-        print('hi 5')
         if lottery_type == 0:
-            print('hi 6')
             notify.send_lotto_buying_message(response, webhook_url)
         else:
-            print('hi 7')
             notify.send_win720_buying_message(response, webhook_url)
 
 def check():
@@ -62,8 +55,6 @@ def check():
     globalAuthCtrl = auth.AuthController()
     globalAuthCtrl.login(username, password)
     response = check_winning_lotto645(globalAuthCtrl)
-    print('slack_webhook_url', slack_webhook_url)
-    print('discord_webhook_url', discord_webhook_url)
     if slack_webhook_url != '':
         send_message(0, 0, response=response, webhook_url=slack_webhook_url)
     if discord_webhook_url != '':
@@ -76,11 +67,7 @@ def check():
         send_message(0, 1, response=response, webhook_url=discord_webhook_url)
 
 def buy(): 
-    
-    load_dotenv() 
-    print('USERNAME:', os.environ.get('USERNAME'))
-    print('PASSWORD:', os.environ.get('PASSWORD'))
-    print('COUNT:', os.environ.get('COUNT'))
+    load_dotenv()
     username = os.environ.get('USERNAME')
     password = os.environ.get('PASSWORD')
     count = int(os.environ.get('COUNT'))
