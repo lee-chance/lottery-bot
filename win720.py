@@ -46,32 +46,21 @@ class Win720:
         self, 
         auth_ctrl: auth.AuthController, 
     ) -> dict:
-        print('cslog buy_Win720')
         assert type(auth_ctrl) == auth.AuthController
-        print('cslog 1')
 
         headers = self._generate_req_headers(auth_ctrl)
-        print('cslog 2')
 
         self.keyCode = headers['Cookie'].split("JSESSIONID=")[1]
-        print('cslog 3')
         win720_round = self._get_round()
-        print('cslog 4')
         
         makeAutoNum_ret = self._makeAutoNumbers(auth_ctrl, win720_round)
-        print('cslog 5')
         parsed_ret = self._decText(json.loads(makeAutoNum_ret)['q']) 
-        print('cslog 6')
         extracted_num = json.loads(parsed_ret)["selLotNo"]
-        print('cslog 7')
         orderNo, orderDate = self._doOrderRequest(auth_ctrl, win720_round, extracted_num)
-        print('cslog 8')
         
         body = json.loads(self._doConnPro(auth_ctrl, win720_round, extracted_num, orderNo, orderDate))
-        print('cslog 9')
 
         self._show_result(body)
-        print('cslog 10')
         return body
 
     def _generate_req_headers(self, auth_ctrl: auth.AuthController) -> dict:
@@ -122,8 +111,11 @@ class Win720:
         return ret['orderNo'], ret['orderDate']
 
     def _doConnPro(self, auth_ctrl: auth.AuthController, win720_round: str, extracted_num: str, orderNo: str, orderDate: str) -> str:
-        payload = "ROUND={}&FLAG=&BUY_KIND=01&BUY_NO={}&BUY_CNT=5&BUY_SET_TYPE=SA%2CSA%2CSA%2CSA%2CSA&BUY_TYPE=A%2CA%2CA%2CA%2CA%2C&CS_TYPE=01&orderNo={}&orderDate={}&TRANSACTION_ID=&WIN_DATE=&USER_ID={}&PAY_TYPE=&resultErrorCode=&resultErrorMsg=&resultOrderNo=&WORKING_FLAG=true&NUM_CHANGE_TYPE=&auto_process=N&set_type=SA&classnum=&selnum=&buytype=M&num1=&num2=&num3=&num4=&num5=&num6=&DSEC=34&CLOSE_DATE=&verifyYN=N&curdeposit=&curpay=5000&DROUND={}&DSEC=0&CLOSE_DATE=&verifyYN=N&lotto720_radio_group=on".format(win720_round,"".join([ "{}{}%2C".format(i,extracted_num) for i in range(1,6)])[:-3],orderNo, orderDate, "fantazm", win720_round)
+        print('cslog 1')
+        payload = f"ROUND={win720_round}&FLAG=&BUY_KIND=01&BUY_NO={"".join([ "{}{}%2C".format(i,extracted_num) for i in range(1,6)])[:-3]}&BUY_CNT=5&BUY_SET_TYPE=SA%2CSA%2CSA%2CSA%2CSA&BUY_TYPE=A%2CA%2CA%2CA%2CA%2C&CS_TYPE=01&orderNo={orderNo}&orderDate={orderDate}&TRANSACTION_ID=&WIN_DATE=&USER_ID={"fantazm"}&PAY_TYPE=&resultErrorCode=&resultErrorMsg=&resultOrderNo=&WORKING_FLAG=true&NUM_CHANGE_TYPE=&auto_process=N&set_type=SA&classnum=&selnum=&buytype=M&num1=&num2=&num3=&num4=&num5=&num6=&DSEC=34&CLOSE_DATE=&verifyYN=N&curdeposit=&curpay=5000&DROUND={win720_round}&DSEC=0&CLOSE_DATE=&verifyYN=N&lotto720_radio_group=on"
+        print('cslog 2', payload)
         headers = self._generate_req_headers(auth_ctrl)
+        print('cslog 3', headers)
         
         data = {
             "q": requests.utils.quote(self._encText(payload))
@@ -136,6 +128,7 @@ class Win720:
         )
 
         ret = self._decText(json.loads(res.text)['q'])
+        print('cslog 4', ret)
         
         return ret
 
