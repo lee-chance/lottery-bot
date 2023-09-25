@@ -67,5 +67,5 @@ class Notification:
             return
 
     def _send_to_webhook(self, webhook_url: str, message: str) -> None:        
-        payload = { "content": message }
+        payload = { "content": message, "text": message } # content for discord, text for slack
         requests.post(webhook_url, json=payload)
