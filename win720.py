@@ -46,21 +46,32 @@ class Win720:
         self, 
         auth_ctrl: auth.AuthController, 
     ) -> dict:
+        print('cslog buy_Win720')
         assert type(auth_ctrl) == auth.AuthController
+        print('cslog 1')
 
         headers = self._generate_req_headers(auth_ctrl)
+        print('cslog 2')
 
         self.keyCode = headers['Cookie'].split("JSESSIONID=")[1]
+        print('cslog 3')
         win720_round = self._get_round()
+        print('cslog 4')
         
         makeAutoNum_ret = self._makeAutoNumbers(auth_ctrl, win720_round)
+        print('cslog 5')
         parsed_ret = self._decText(json.loads(makeAutoNum_ret)['q']) 
+        print('cslog 6')
         extracted_num = json.loads(parsed_ret)["selLotNo"]
+        print('cslog 7')
         orderNo, orderDate = self._doOrderRequest(auth_ctrl, win720_round, extracted_num)
+        print('cslog 8')
         
         body = json.loads(self._doConnPro(auth_ctrl, win720_round, extracted_num, orderNo, orderDate))
+        print('cslog 9')
 
         self._show_result(body)
+        print('cslog 10')
         return body
 
     def _generate_req_headers(self, auth_ctrl: auth.AuthController) -> dict:
