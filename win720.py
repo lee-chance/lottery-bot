@@ -48,7 +48,6 @@ class Win720:
     ) -> dict:
         assert type(auth_ctrl) == auth.AuthController
 
-        print('cslog user_id:', auth_ctrl.user_id)
         print('cslog userID:', auth_ctrl.userID)
 
         headers = self._generate_req_headers(auth_ctrl)
