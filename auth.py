@@ -23,6 +23,8 @@ class AuthController:
 
     _AUTH_CRED = ""
 
+    userID: str
+
     def login(self, user_id: str, password: str):
         assert type(user_id) == str
         assert type(password) == str
@@ -36,6 +38,8 @@ class AuthController:
         data = self._generate_body(user_id, password)
 
         _res = self._try_login(headers, data)  # 새로운 값의 JSESSIONID가 내려오는데, 이 값으론 로그인 안됨
+
+        self.userID = user_id
 
         self._update_auth_cred(default_auth_cred)
 

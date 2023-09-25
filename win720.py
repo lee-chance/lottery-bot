@@ -48,6 +48,9 @@ class Win720:
     ) -> dict:
         assert type(auth_ctrl) == auth.AuthController
 
+        print('cslog user_id:', auth_ctrl.user_id)
+        print('cslog userID:', auth_ctrl.userID)
+
         headers = self._generate_req_headers(auth_ctrl)
 
         self.keyCode = headers['Cookie'].split("JSESSIONID=")[1]
@@ -111,13 +114,10 @@ class Win720:
         return ret['orderNo'], ret['orderDate']
 
     def _doConnPro(self, auth_ctrl: auth.AuthController, win720_round: str, extracted_num: str, orderNo: str, orderDate: str) -> str:
-        print('cslog 1')
         buyNo = "".join([ "{}{}%2C".format(i,extracted_num) for i in range(1,6)])[:-3]
-        userID = "ckdtn0729"
+        userID = auth_ctrl.user_id
         payload = f"ROUND={win720_round}&FLAG=&BUY_KIND=01&BUY_NO={buyNo}&BUY_CNT=5&BUY_SET_TYPE=SA%2CSA%2CSA%2CSA%2CSA&BUY_TYPE=A%2CA%2CA%2CA%2CA%2C&CS_TYPE=01&orderNo={orderNo}&orderDate={orderDate}&TRANSACTION_ID=&WIN_DATE=&USER_ID={userID}&PAY_TYPE=&resultErrorCode=&resultErrorMsg=&resultOrderNo=&WORKING_FLAG=true&NUM_CHANGE_TYPE=&auto_process=N&set_type=SA&classnum=&selnum=&buytype=M&num1=&num2=&num3=&num4=&num5=&num6=&DSEC=34&CLOSE_DATE=&verifyYN=N&curdeposit=&curpay=5000&DROUND={win720_round}&DSEC=0&CLOSE_DATE=&verifyYN=N&lotto720_radio_group=on"
-        print('cslog 2', payload)
         headers = self._generate_req_headers(auth_ctrl)
-        print('cslog 3', headers)
         
         data = {
             "q": requests.utils.quote(self._encText(payload))
