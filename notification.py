@@ -1,4 +1,5 @@
 import requests
+import re
 
 class Notification:
     def send_recharge_message(self, body: dict, webhook_url: str) -> None:
@@ -68,8 +69,6 @@ class Notification:
         assert type(webhook_url) == str
 
         try: 
-            round = winning["round"]
-            money = winning["money"]
             if winning["lotto_details"]:
                 max_label_status_length = max(len(f"{line['label']} {line['status']}") for line in winning["lotto_details"])
                 formatted_lines = []
