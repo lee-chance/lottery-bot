@@ -101,7 +101,7 @@ class Notification:
             else:
                 winning_message = f"로또 *{winning['round']}회* - 다음 기회에... 🫠"
 
-            message = f"```ini\n{formatted_results}```\n{winning_message}"
+            message = f"```\n{formatted_results}```\n{winning_message}"
             self._send_to_webhook(webhook_url, message)
 
         except KeyError:
@@ -122,7 +122,7 @@ class Notification:
                     formatted_lines.append(f"{line_label_status} {line['result']}")
                 
                 formatted_results = "\n".join(formatted_lines)
-                message_content = f"```ini\n{formatted_results}```\n"
+                message_content = f"```\n{formatted_results}```\n"
             else:
                 message_content = ""
 
