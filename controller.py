@@ -7,6 +7,7 @@ import lotto645
 import win720
 import notification
 from recharge import Recharge
+from rechargeV2 import RechargeV2
 import time
 
 
@@ -104,7 +105,8 @@ def buy():
         send_message(1, 1, response=response, webhook_url=discord_webhook_url)
 
 def recharge():
-    load_dotenv()
+    load_dotenv('.env.local', override=True)
+
     username = os.environ.get('USERNAME')
     password = os.environ.get('PASSWORD')
     amount = int(os.environ.get('AMOUNT', '0'))
@@ -124,6 +126,20 @@ def recharge():
         notify = notification.Notification()
         notify.send_recharge_message(response, slack_webhook_url)
 
+def recharge_v2():
+    load_dotenv(override=True)
+
+    username = os.environ.get('USERNAME')
+    password = os.environ.get('PASSWORD')
+    amount = int(os.environ.get('AMOUNT', '0'))
+    
+    r = RechargeV2()
+    response = r.recharge(username, password, amount)
+    slack_webhook_url = os.environ.get('SLACK_WEBHOOK_URL') 
+    if slack_webhook_url != '':
+        notify = notification.Notification()
+        notify.send_recharge_message(response, slack_webhook_url)
+
 def run():
     if len(sys.argv) < 2:
         print("Usage: python controller.py [buy|check]")
@@ -134,7 +150,8 @@ def run():
     elif sys.argv[1] == "check":
         check()
     elif sys.argv[1] == "recharge":
-        recharge()
+        # recharge()
+        recharge_v2()
 
 if __name__ == "__main__":
     run()
