@@ -127,6 +127,7 @@ def recharge():
         notify.send_recharge_message(response, slack_webhook_url)
 
 def recharge_v2():
+    # load_dotenv('.env.local', override=True)
     load_dotenv(override=True)
 
     username = os.environ.get('USERNAME')

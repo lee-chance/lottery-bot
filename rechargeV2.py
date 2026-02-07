@@ -89,15 +89,12 @@ class RechargeV2:
         # 하드코딩된 모델 목록 (필요 시 이 배열만 수정하세요)
         models: List[str] = [
             "x-ai/grok-4.1-fast",
-            "x-ai/grok-4.1-fast:free",
-            "google/gemma-3-27b-it:free",
             "google/gemini-2.0-flash-exp:free",
             # "nvidia/nemotron-nano-12b-v2-vl:free",
             "mistralai/mistral-small-3.1-24b-instruct:free",
-            "mistralai/mistral-small-3.2-24b-instruct:free",
-            # "qwen/qwen2.5-vl-32b-instruct:free",
             "google/gemma-3-4b-it:free",
             "google/gemma-3-12b-it:free",
+            "google/gemma-3-27b-it:free",
         ]
 
         if not api_key:
@@ -249,6 +246,10 @@ Output only the numeric array, nothing else — no explanations or text."},
                 continue
             if set(keypad_layout) != set(range(10)):
                 continue
+            if keypad_layout == [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]:
+                continue
+            if keypad_layout == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+                continue
             return keypad_layout
 
         print("[Recharge] All models failed to produce a valid keypad layout")
@@ -320,6 +321,7 @@ Output only the numeric array, nothing else — no explanations or text."},
             try:
                 wait.until(EC.element_to_be_clickable(el))
                 el.click()
+                # print(f"[Recharge] Clicked number: {num} (Index: {index}, Coords: {coords})")
             except Exception as _e:
                 print(f"[Recharge] Keypad click failed index={num} coords={coords} action={action}: {_e}")
                 traceback.print_exc()
