@@ -274,13 +274,32 @@ Output only the numeric array, nothing else — no explanations or text."},
             key_layout_img = keypad.find_element(By.CSS_SELECTOR, "img.kpd-image-button")
             
             # JavaScript를 사용하여 이미지를 base64로 변환
+            # base64_data = driver.execute_script("""
+            #     const img = arguments[0];
+            #     const canvas = document.createElement('canvas');
+            #     canvas.width = img.naturalWidth || img.width;
+            #     canvas.height = img.naturalHeight || img.height;
+            #     const ctx = canvas.getContext('2d');
+            #     ctx.drawImage(img, 0, 0);
+            #     return canvas.toDataURL('image/png');
+            # """, key_layout_img)
             base64_data = driver.execute_script("""
                 const img = arguments[0];
+                const naturalWidth = img.naturalWidth || img.width;
+                const naturalHeight = img.naturalHeight || img.height;
+                
                 const canvas = document.createElement('canvas');
-                canvas.width = img.naturalWidth || img.width;
-                canvas.height = img.naturalHeight || img.height;
+                // 왼쪽 50%를 자르기 위해 캔버스 너비를 절반으로 설정
+                canvas.width = naturalWidth / 2;
+                canvas.height = naturalHeight;
+                
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
+                // 원본 이미지의 오른쪽 절반(naturalWidth / 2 지점부터)을 캔버스의 (0, 0) 위치에 그림
+                ctx.drawImage(
+                    img, 
+                    naturalWidth / 2, 0, naturalWidth / 2, naturalHeight, // 소스 영역 (오른쪽 절반)
+                    0, 0, naturalWidth / 2, naturalHeight                // 대상 영역
+                );
                 return canvas.toDataURL('image/png');
             """, key_layout_img)
             
@@ -288,6 +307,7 @@ Output only the numeric array, nothing else — no explanations or text."},
                 print("[Recharge] Failed to convert image to base64")
                 return ""
             
+            print(f"[Recharge] Base64 data: {base64_data}")
             return base64_data
         except Exception as e:
             print(f"[Recharge] Failed to extract image as base64: {e}")
@@ -410,12 +430,16 @@ Output only the numeric array, nothing else — no explanations or text."},
             if current_url and "/mypage/mndpChrg" in current_url: # 충전 성공했을때 가는 페이지
                 print("[Recharge] Detected /mypage/mndpChrg domain in URL.")
                 if "예치금 충전이 완료되었습니다." in alert_text:
+                    print("[Recharge] Recharge successful")
                     return {"status": "success", "amount": amount}
                 else:
+                    print(f"[Recharge] Recharge failed: {alert_text}")
                     return {"status": "error", "error": alert_text}
             else:
                 if alert_text is None:
+                    print("[Recharge] Recharge failed: no alert detected")
                     return {"status": "error", "error": "no alert detected"}
+                print(f"[Recharge] Recharge failed: {alert_text}")
                 return {"status": "error", "error": alert_text}
             
         except Exception as e:

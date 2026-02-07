@@ -50,6 +50,7 @@ def send_message(mode: int, lottery_type: int, response: dict, webhook_url: str)
 
 def check():
     load_dotenv(override=True)
+    # load_dotenv('.env.local', override=True)
 
     username = os.environ.get('USERNAME')
     password = os.environ.get('PASSWORD')
@@ -61,21 +62,22 @@ def check():
     globalAuthCtrl.login(username, password)
     
     response = check_winning_lotto645(globalAuthCtrl)
-    if slack_webhook_url != '':
+    if slack_webhook_url:
         send_message(0, 0, response=response, webhook_url=slack_webhook_url)
-    if discord_webhook_url != '':
+    if discord_webhook_url:
         send_message(0, 0, response=response, webhook_url=discord_webhook_url)
 
     time.sleep(10)
     
     response = check_winning_win720(globalAuthCtrl)
-    if slack_webhook_url != '':
+    if slack_webhook_url:
         send_message(0, 1, response=response, webhook_url=slack_webhook_url)
-    if discord_webhook_url != '':
+    if discord_webhook_url:
         send_message(0, 1, response=response, webhook_url=discord_webhook_url)
 
 def buy(): 
     load_dotenv(override=True)
+    # load_dotenv('.env.local', override=True)
 
     username = os.environ.get('USERNAME')
     password = os.environ.get('PASSWORD')
@@ -88,9 +90,9 @@ def buy():
     globalAuthCtrl.login(username, password)
 
     response = buy_lotto645(globalAuthCtrl, count, mode) 
-    if slack_webhook_url != '':
+    if slack_webhook_url:
         send_message(1, 0, response=response, webhook_url=slack_webhook_url)
-    if discord_webhook_url != '':
+    if discord_webhook_url:
         send_message(1, 0, response=response, webhook_url=discord_webhook_url)
 
     time.sleep(10)
@@ -99,36 +101,36 @@ def buy():
     globalAuthCtrl.login(username, password)
     
     response = buy_win720(globalAuthCtrl, username)
-    if slack_webhook_url != '':
+    if slack_webhook_url:
         send_message(1, 1, response=response, webhook_url=slack_webhook_url)
-    if discord_webhook_url != '':
+    if discord_webhook_url:
         send_message(1, 1, response=response, webhook_url=discord_webhook_url)
 
-def recharge():
-    load_dotenv('.env.local', override=True)
+# def recharge():
+#     load_dotenv('.env.local', override=True)
 
-    username = os.environ.get('USERNAME')
-    password = os.environ.get('PASSWORD')
-    amount = int(os.environ.get('AMOUNT', '0'))
+#     username = os.environ.get('USERNAME')
+#     password = os.environ.get('PASSWORD')
+#     amount = int(os.environ.get('AMOUNT', '0'))
 
-    globalAuthCtrl = auth.AuthController()
-    globalAuthCtrl.login(username, password)
-    headers_with_cookie = globalAuthCtrl.add_auth_cred_to_headers({})
-    cookie_header = headers_with_cookie.get("Cookie", "")
-    jsession_id = ""
-    if "JSESSIONID=" in cookie_header:
-        jsession_id = cookie_header.split("JSESSIONID=", 1)[1].strip()
+#     globalAuthCtrl = auth.AuthController()
+#     globalAuthCtrl.login(username, password)
+#     headers_with_cookie = globalAuthCtrl.add_auth_cred_to_headers({})
+#     cookie_header = headers_with_cookie.get("Cookie", "")
+#     jsession_id = ""
+#     if "JSESSIONID=" in cookie_header:
+#         jsession_id = cookie_header.split("JSESSIONID=", 1)[1].strip()
 
-    r = Recharge()
-    response = r.recharge(jsession_id, amount)
-    slack_webhook_url = os.environ.get('SLACK_WEBHOOK_URL') 
-    if slack_webhook_url != '':
-        notify = notification.Notification()
-        notify.send_recharge_message(response, slack_webhook_url)
+#     r = Recharge()
+#     response = r.recharge(jsession_id, amount)
+#     slack_webhook_url = os.environ.get('SLACK_WEBHOOK_URL') 
+#     if slack_webhook_url != '':
+#         notify = notification.Notification()
+#         notify.send_recharge_message(response, slack_webhook_url)
 
 def recharge_v2():
-    # load_dotenv('.env.local', override=True)
     load_dotenv(override=True)
+    # load_dotenv('.env.local', override=True)
 
     username = os.environ.get('USERNAME')
     password = os.environ.get('PASSWORD')
