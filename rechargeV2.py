@@ -285,6 +285,9 @@ Output only the numeric array, nothing else — no explanations or text."},
             # """, key_layout_img)
             base64_data = driver.execute_script("""
                 const img = arguments[0];
+                if (!img.complete || img.naturalWidth === 0) {
+                    return "ERROR: Image not loaded";
+                }
                 const naturalWidth = img.naturalWidth || img.width;
                 const naturalHeight = img.naturalHeight || img.height;
                 
@@ -304,7 +307,7 @@ Output only the numeric array, nothing else — no explanations or text."},
             """, key_layout_img)
             
             if not base64_data or not base64_data.startswith('data:'):
-                print("[Recharge] Failed to convert image to base64")
+                print(f"[Recharge] Failed to convert image to base64: {base64_data}")
                 return ""
             
             print(f"[Recharge] Base64 data: {base64_data}")

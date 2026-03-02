@@ -17,6 +17,11 @@ import auth
 import common
 import re
 
+import logging
+import time
+
+logger = logging.getLogger(__name__)
+
 class Win720:
 
     keySize = 128
@@ -56,10 +61,6 @@ class Win720:
     ) -> dict:
         assert isinstance(auth_ctrl, auth.AuthController)
 
-        headers = self._generate_req_headers(auth_ctrl)
-        
-        requirements = self._getRequirements(headers)
-
         jsessionid = auth_ctrl.get_current_session_id()
         
         self.keyCode = jsessionid
@@ -71,13 +72,7 @@ class Win720:
             q_val = json.loads(makeAutoNum_ret)['q']
         except json.JSONDecodeError:
             raise ValueError(f"Failed to parse makeAutoNum response: {makeAutoNum_ret[:100]}...")
-        except Exception as e:
-            raise e
-            
-        try:
-            decrypted = self._decText(q_val)
-        except Exception as e:
-            raise e
+        decrypted = self._decText(q_val)
         
         if "resultMsg" in decrypted and ":" in decrypted:
              decrypted = re.sub(r'("resultMsg":\s*)([^",}]*)([,}])', r'\1"\2"\3', decrypted)
@@ -103,28 +98,11 @@ class Win720:
         assert isinstance(auth_ctrl, auth.AuthController)
         return auth_ctrl.add_auth_cred_to_headers(self._REQ_HEADERS)
     
-    def _getRequirements(self, headers: dict) -> list:
-        org_headers = headers.copy()
-        
-        headers["Referer"] = "https://el.dhlottery.co.kr/game/pension720/game.jsp"
-        headers["Content-Type"] = "application/json" 
-        headers["X-Requested-With"] = "XMLHttpRequest"
-
-        try:
-             res = self.http_client.post(
-                url="https://el.dhlottery.co.kr/olotto/game/egovUserReadySocket.json", 
-                headers=headers
-            )
-             direct = json.loads(res.text)["ready_ip"]
-        except:
-             pass
-        
-        return []
 
     def _get_round(self) -> str:
         try:
             res = self.http_client.get(
-                "https://dhlottery.co.kr/common.do?method=main",
+                "https://www.dhlottery.co.kr/common.do?method=main",
                 headers=self._REQ_HEADERS
             )
             html = res.text
@@ -134,7 +112,7 @@ class Win720:
                 return str(int(found.text) - 1)
             else:
                 raise ValueError("drwNo720 not found")
-        except:
+        except (requests.RequestException, AttributeError, ValueError):
              base_date = datetime.datetime(2024, 12, 26)
              base_round = 244
              
@@ -155,11 +133,23 @@ class Win720:
             "q": requests.utils.quote(self._encText(payload))
         }
 
-        res = self.http_client.post(
-            url="https://el.dhlottery.co.kr/makeAutoNo.do", 
-            headers=headers,
-            data=data
-        )
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                res = self.http_client.post(
+                    url="https://el.dhlottery.co.kr/makeAutoNo.do", 
+                    headers=headers,
+                    data=data
+                )
+                res.raise_for_status()
+                break
+            except requests.RequestException as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"[Retry] makeAutoNo connection failed ({attempt+1}/{max_retries}): {e}. Retrying in 2s...")
+                    time.sleep(2)
+                else:
+                    logger.error(f"[Error] makeAutoNo connection failed after {max_retries} attempts: {e}")
+                    raise
 
         return res.text
 
@@ -171,17 +161,29 @@ class Win720:
             "q": requests.utils.quote(self._encText(payload))
         }
 
-        res = self.http_client.post(
-            url="https://el.dhlottery.co.kr/makeOrderNo.do", 
-            headers=headers,
-            data=data
-        )
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                res = self.http_client.post(
+                    url="https://el.dhlottery.co.kr/makeOrderNo.do", 
+                    headers=headers,
+                    data=data
+                )
+                res.raise_for_status()
+                break
+            except requests.RequestException as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"[Retry] makeOrderNo connection failed ({attempt+1}/{max_retries}): {e}. Retrying in 2s...")
+                    time.sleep(2)
+                else:
+                    logger.error(f"[Error] makeOrderNo connection failed after {max_retries} attempts: {e}")
+                    raise
 
         try:
             ret = json.loads(self._decText(json.loads(res.text)['q']))
             return ret['orderNo'], ret['orderDate']
-        except ValueError:
-             raise ValueError(f"Failed to parse doOrderRequest/decText: {res.text[:100]}...")
+        except (json.JSONDecodeError, KeyError) as err:
+             raise ValueError(f"Failed to parse doOrderRequest/decText: {res.text[:100]}...") from err
 
     def _doConnPro(self, auth_ctrl: auth.AuthController, win720_round: str, extracted_num: str, username: str, orderNo: str, orderDate: str) -> str:
         payload = "ROUND={}&FLAG=&BUY_KIND=01&BUY_NO={}&BUY_CNT=5&BUY_SET_TYPE=SA%2CSA%2CSA%2CSA%2CSA&BUY_TYPE=A%2CA%2CA%2CA%2CA%2C&CS_TYPE=01&orderNo={}&orderDate={}&TRANSACTION_ID=&WIN_DATE=&USER_ID={}&PAY_TYPE=&resultErrorCode=&resultErrorMsg=&resultOrderNo=&WORKING_FLAG=true&NUM_CHANGE_TYPE=&auto_process=N&set_type=SA&classnum=&selnum=&buytype=M&num1=&num2=&num3=&num4=&num5=&num6=&DSEC=34&CLOSE_DATE=&verifyYN=N&curdeposit=&curpay=5000&DROUND={}&DSEC=0&CLOSE_DATE=&verifyYN=N&lotto720_radio_group=on".format(win720_round,"".join([ "{}{}%2C".format(i,extracted_num) for i in range(1,6)])[:-3],orderNo, orderDate, username, win720_round)
@@ -191,17 +193,30 @@ class Win720:
             "q": requests.utils.quote(self._encText(payload))
         }
         
-        res = self.http_client.post(
-            url="https://el.dhlottery.co.kr/connPro.do", 
-            headers=headers,
-            data=data
-        )
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                res = self.http_client.post(
+                    url="https://el.dhlottery.co.kr/connPro.do", 
+                    headers=headers,
+                    data=data
+                )
+                res.raise_for_status()
+                break
+            except requests.RequestException as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"[Retry] connPro connection failed ({attempt+1}/{max_retries}): {e}. Retrying in 2s...")
+                    time.sleep(2)
+                else:
+                    logger.error(f"[Error] connPro connection failed after {max_retries} attempts: {e}")
+                    raise
 
         try:
             ret = self._decText(json.loads(res.text)['q'])
+        except (json.JSONDecodeError, KeyError) as err:
+             raise ValueError(f"Failed to parse doConnPro: {res.text[:100]}...") from err
+        else:
             return ret
-        except ValueError:
-             raise ValueError(f"Failed to parse doConnPro: {res.text[:100]}...")
 
     def _encText(self, plainText: str) -> str:
         encSalt = get_random_bytes(32)
@@ -277,15 +292,18 @@ class Win720:
                         
                         purchased_date = item.get("eltOrdrDt", "-")
                         round_no = item.get("ltEpsdView", "")
-                        money = item.get("ltWnAmt", "-")
+                        money_raw = item.get("ltWnAmt", "0")
+                        if money_raw is None:
+                            money_raw = "0"
                         
                         if "회" in round_no:
                             round_no = round_no.replace("회", "")
                         
-                        if money == "0" or money == 0:
-                             money = "0 원"
-                        else:
-                            money = f"{int(money):,} 원" 
+                        try:
+                            val = int(money_raw)
+                            money = f"{val:,} 원"
+                        except (ValueError, TypeError):
+                            money = "0 원"
                             
                         result_data = {
                             "round": round_no,
@@ -320,7 +338,7 @@ class Win720:
                                     else:
                                         try:
                                             rank = int(rank)
-                                        except:
+                                        except (ValueError, TypeError):
                                             rank = 0
                                             
                                     status = "0등" if rank == 0 else f"{rank}등"
@@ -361,10 +379,7 @@ class Win720:
                                         
                                         formatted_num = " ".join(formatted_chars)
                                         
-                                        if hl_group:
-                                             label = f"{group}조"
-                                        else:
-                                             label = f"{group}조"
+                                        label = f"{group}조"
                                         
                                         result_str = formatted_num
                                     else:
@@ -381,13 +396,13 @@ class Win720:
                             result_data["win720_details"] = win720_details
 
                         except Exception as e:
-                            print(f"[Error] Win720 detail error: {e}")
+                            logger.error(f"[Error] Win720 detail error: {e}")
                             
                 except Exception as e:
-                     print(f"[Error] Win720 list process error: {e}")
+                     logger.error(f"[Error] Win720 list process error: {e}")
             
         except Exception as e:
-            print(f"[Error] Win720 check error: {e}")
+            logger.error(f"[Error] Win720 check error: {e}")
 
         return result_data
     
