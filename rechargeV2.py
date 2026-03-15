@@ -88,8 +88,9 @@ class RechargeV2:
         api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
         # 하드코딩된 모델 목록 (필요 시 이 배열만 수정하세요)
         models: List[str] = [
-            "x-ai/grok-4.1-fast",
-            "google/gemini-2.0-flash-exp:free",
+            # "x-ai/grok-4.1-fast",
+            "openrouter/healer-alpha",
+            # "google/gemini-2.0-flash-exp:free",
             # "nvidia/nemotron-nano-12b-v2-vl:free",
             "mistralai/mistral-small-3.1-24b-instruct:free",
             "google/gemma-3-4b-it:free",
@@ -262,60 +263,55 @@ Output only the numeric array, nothing else — no explanations or text."},
         except Exception:
             return wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.nppfs-keypad")))
 
-    def _extract_layout_image_as_base64(self, driver: webdriver.Chrome, keypad: WebElement) -> str:
+    def _extract_layout_image_as_base64(self, driver: webdriver.Chrome, keypad: WebElement, max_retries: int = 5) -> str:
         """
         키패드 내 레이아웃 가이드 이미지를 JavaScript를 통해 base64 문자열로 반환합니다.
         
         반환 형식: data:image/png;base64,iVBORw0KGgoAAAANS...
-        실패 시 빈 문자열을 반환합니다.
+        오류 발생 시 최대 max_retries회 재시도하며, 최종 실패 시 빈 문자열을 반환합니다.
         """
-        try:
-            # 이미지 요소 찾기
-            key_layout_img = keypad.find_element(By.CSS_SELECTOR, "img.kpd-image-button")
-            
-            # JavaScript를 사용하여 이미지를 base64로 변환
-            # base64_data = driver.execute_script("""
-            #     const img = arguments[0];
-            #     const canvas = document.createElement('canvas');
-            #     canvas.width = img.naturalWidth || img.width;
-            #     canvas.height = img.naturalHeight || img.height;
-            #     const ctx = canvas.getContext('2d');
-            #     ctx.drawImage(img, 0, 0);
-            #     return canvas.toDataURL('image/png');
-            # """, key_layout_img)
-            base64_data = driver.execute_script("""
-                const img = arguments[0];
-                if (!img.complete || img.naturalWidth === 0) {
-                    return "ERROR: Image not loaded";
-                }
-                const naturalWidth = img.naturalWidth || img.width;
-                const naturalHeight = img.naturalHeight || img.height;
+        for attempt in range(1, max_retries + 1):
+            try:
+                key_layout_img = keypad.find_element(By.CSS_SELECTOR, "img.kpd-image-button")
                 
-                const canvas = document.createElement('canvas');
-                // 왼쪽 50%를 자르기 위해 캔버스 너비를 절반으로 설정
-                canvas.width = naturalWidth / 2;
-                canvas.height = naturalHeight;
+                base64_data = driver.execute_script("""
+                    const img = arguments[0];
+                    if (!img.complete || img.naturalWidth === 0) {
+                        return "ERROR: Image not loaded";
+                    }
+                    const naturalWidth = img.naturalWidth || img.width;
+                    const naturalHeight = img.naturalHeight || img.height;
+                    
+                    const canvas = document.createElement('canvas');
+                    canvas.width = naturalWidth / 2;
+                    canvas.height = naturalHeight;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(
+                        img, 
+                        naturalWidth / 2, 0, naturalWidth / 2, naturalHeight,
+                        0, 0, naturalWidth / 2, naturalHeight
+                    );
+                    return canvas.toDataURL('image/png');
+                """, key_layout_img)
                 
-                const ctx = canvas.getContext('2d');
-                // 원본 이미지의 오른쪽 절반(naturalWidth / 2 지점부터)을 캔버스의 (0, 0) 위치에 그림
-                ctx.drawImage(
-                    img, 
-                    naturalWidth / 2, 0, naturalWidth / 2, naturalHeight, // 소스 영역 (오른쪽 절반)
-                    0, 0, naturalWidth / 2, naturalHeight                // 대상 영역
-                );
-                return canvas.toDataURL('image/png');
-            """, key_layout_img)
-            
-            if not base64_data or not base64_data.startswith('data:'):
-                print(f"[Recharge] Failed to convert image to base64: {base64_data}")
+                if not base64_data or not base64_data.startswith('data:'):
+                    print(f"[Recharge] Failed to convert image to base64 (attempt {attempt}/{max_retries}): {base64_data}")
+                    if attempt < max_retries:
+                        time.sleep(1)
+                        continue
+                    return ""
+                
+                print(f"[Recharge] Base64 data: {base64_data}")
+                return base64_data
+            except Exception as e:
+                print(f"[Recharge] Failed to extract image as base64 (attempt {attempt}/{max_retries}): {e}")
+                traceback.print_exc()
+                if attempt < max_retries:
+                    time.sleep(1)
+                    continue
                 return ""
-            
-            print(f"[Recharge] Base64 data: {base64_data}")
-            return base64_data
-        except Exception as e:
-            print(f"[Recharge] Failed to extract image as base64: {e}")
-            traceback.print_exc()
-            return ""
+        return ""
 
     def _parse_coords(self, el: WebElement) -> tuple:
         """키 이미지의 data-coords(y/x)를 파싱해 정렬 키로 사용합니다. 실패 시 큰 값 반환."""
@@ -408,6 +404,9 @@ Output only the numeric array, nothing else — no explanations or text."},
             try:
                 keypad = self._find_keypad_element(wait)
                 layout_img_src = self._extract_layout_image_as_base64(driver, keypad)
+                if not layout_img_src:
+                    print("[Recharge] Skipping keypad layout inference: layout image extraction failed after all retries")
+                    return {"status": "error", "error": "layout image extraction failed"}
                 keypad_layout = self._infer_keypad_layout_via_openrouter(layout_img_src)
                 if keypad_layout is None:
                     print("[Recharge] Skipping keypad clicking due to missing or invalid keypad layout")
