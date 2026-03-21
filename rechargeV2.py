@@ -66,7 +66,10 @@ class RechargeV2:
         desired_value = str(amount)
         if desired_value not in allowed_values:
             desired_value = "10000"
-        select_el = wait.until(EC.presence_of_element_located((By.ID, "EcAmt")))
+        select_el = wait.until(
+            EC.element_to_be_clickable((By.ID, "EcAmt"))
+        )
+        # select_el = wait.until(EC.presence_of_element_located((By.ID, "EcAmt")))
         Select(select_el).select_by_value(desired_value)
 
     def _click_payment_button(self, wait: WebDriverWait) -> None:
@@ -397,6 +400,7 @@ Output only the numeric array, nothing else — no explanations or text."},
                 print(f"[Recharge] Failed to select amount: {e}")
                 traceback.print_exc()
 
+            time.sleep(100)
             # 충전 팝업 열기
             self._click_payment_button(wait)
 
