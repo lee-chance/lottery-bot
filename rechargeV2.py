@@ -81,6 +81,38 @@ class RechargeV2:
             btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[@id='con1']/div/div[3]/button")))
             btn.click()
 
+    def _switch_to_ecaccount_popup(self, driver: webdriver.Chrome, timeout_seconds: float = 10) -> None:
+        """URL에 ecAccount.do가 포함된 팝업으로 전환합니다. 없으면 기존 창을 유지합니다."""
+        target_substr = "dhlottery.co.kr/ecAccount.do"
+        original_handle = getattr(driver, "current_window_handle", None)
+        start_ts = time.time()
+        logged_handles = None
+
+        while time.time() - start_ts < timeout_seconds:
+            handles = driver.window_handles
+            handles_snapshot = tuple(handles)
+            if handles_snapshot != logged_handles:
+                print(f"[Recharge] Window handles after payment click: {handles}")
+                logged_handles = handles_snapshot
+            for handle in handles:
+                try:
+                    driver.switch_to.window(handle)
+                    current_url = driver.current_url or ""
+                    print(f"[Recharge] Inspecting window handle={handle} url={current_url}")
+                    if target_substr in current_url:
+                        print(f"[Recharge] Switched to target popup: {current_url}")
+                        return
+                except Exception:
+                    continue
+            time.sleep(0.2)
+
+        if original_handle:
+            try:
+                driver.switch_to.window(original_handle)
+            except Exception:
+                pass
+        print("[Recharge] Target popup (ecAccount.do) not found; staying in current window")
+
     def _infer_keypad_layout_via_openrouter(self, layout_img_src: str) -> Optional[List[int]]:
         """
         키패드 프롬프트 이미지를 기반으로 0~9의 배열 순서를 OpenRouter로부터 추론합니다.
@@ -400,9 +432,9 @@ Output only the numeric array, nothing else — no explanations or text."},
                 print(f"[Recharge] Failed to select amount: {e}")
                 traceback.print_exc()
 
-            time.sleep(100)
             # 충전 팝업 열기
             self._click_payment_button(wait)
+            self._switch_to_ecaccount_popup(driver)
 
             # 직접 클릭: 키패드 찾기 → 레이아웃 이미지 추출 → 키패드 배열 추론 → 키 이미지 정렬 → 비밀번호 클릭
             try:
@@ -420,6 +452,7 @@ Output only the numeric array, nothing else — no explanations or text."},
             except Exception as e:
                 print(f"[Recharge] Keypad clicking failed: {e}")
                 traceback.print_exc()
+                return {"status": "error", "error": f"keypad clicking failed: {e}"}
 
             # 충전 성공 확인
             # url 가져오기
