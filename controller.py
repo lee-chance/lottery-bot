@@ -142,6 +142,11 @@ def recharge_v2():
     if slack_webhook_url != '':
         notify = notification.Notification()
         notify.send_recharge_message(response, slack_webhook_url)
+    
+    if response.get("status") == "error":
+        error_msg = response.get("error", "unknown error")
+        print(f"[Error] Recharge failed: {error_msg}")
+        sys.exit(1)
 
 def run():
     if len(sys.argv) < 2:
