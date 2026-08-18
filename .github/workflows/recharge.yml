@@ -8,6 +8,7 @@ jobs:
   build:
     runs-on: [ubuntu-latest]
     name: Recharge
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -22,7 +23,7 @@ jobs:
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
           AMOUNT: 10000
-          WAIT_TIMEOUT_SECONDS: 10
+          WAIT_TIMEOUT_SECONDS: 30
           HEADLESS: True
           ACCOUNT_PASSWORD: ${{ secrets.ACCOUNT_PASSWORD }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
