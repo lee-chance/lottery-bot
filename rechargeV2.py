@@ -455,18 +455,18 @@ Output only the numeric array, nothing else — no explanations or text."},
                 return {"status": "error", "error": f"keypad clicking failed: {e}"}
 
             # 충전 성공 확인
-            # url 가져오기
             current_url = driver.current_url if driver else None
             print(f"[Recharge] Current page URL: {current_url}")
-            # 알럿 가져오기
-            alert_body = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#msgPop_1 > div.pop-up > div > div.pop-body")))
+            
+            try:
+                alert_body = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#msgPop_1 > div.pop-up > div > div.pop-body")))
+                alert_text = alert_body.text
+                print(f"[Recharge] Alert text: {alert_text}")
+            except TimeoutException:
+                print("[Recharge] Timeout waiting for alert popup")
+                return {"status": "error", "error": "timeout waiting for alert popup"}
 
-            # 출금계좌의 잔액이 부족합니다.\n(케이뱅크 고객센터 1522-1000)
-            # 간편충전 비밀번호를\n정확하게 입력해 주세요.\n(1회 입력 실패)
-            # 예치금 충전이 완료되었습니다.
-            alert_text = alert_body.text
-
-            if current_url and "/mypage/mndpChrg" in current_url: # 충전 성공했을때 가는 페이지
+            if current_url and "/mypage/mndpChrg" in current_url:
                 print("[Recharge] Detected /mypage/mndpChrg domain in URL.")
                 if "예치금 충전이 완료되었습니다." in alert_text:
                     print("[Recharge] Recharge successful")
@@ -475,9 +475,7 @@ Output only the numeric array, nothing else — no explanations or text."},
                     print(f"[Recharge] Recharge failed: {alert_text}")
                     return {"status": "error", "error": alert_text}
             else:
-                if alert_text is None:
-                    print("[Recharge] Recharge failed: no alert detected")
-                    return {"status": "error", "error": "no alert detected"}
+                print(f"[Recharge] Unexpected URL: {current_url}")
                 print(f"[Recharge] Recharge failed: {alert_text}")
                 return {"status": "error", "error": alert_text}
             
