@@ -12,7 +12,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 
 import requests
 import json
@@ -72,14 +72,78 @@ class RechargeV2:
         # select_el = wait.until(EC.presence_of_element_located((By.ID, "EcAmt")))
         Select(select_el).select_by_value(desired_value)
 
+    def _dismiss_overlays(self, driver: webdriver.Chrome) -> None:
+        """화면을 가리는 팝업이나 오버레이를 제거합니다."""
+        try:
+            # 일반적인 알림/공지 팝업 닫기 시도
+            close_selectors = [
+                "button.btn-close",
+                "a.btn-close",
+                ".popup-close",
+                ".layer-close",
+                "button[onclick*='close']",
+            ]
+            for selector in close_selectors:
+                try:
+                    close_btns = driver.find_elements(By.CSS_SELECTOR, selector)
+                    for btn in close_btns:
+                        if btn.is_displayed():
+                            print(f"[Recharge] Dismissing overlay via selector: {selector}")
+                            btn.click()
+                            time.sleep(0.3)
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[Recharge] Overlay dismissal check failed (non-critical): {e}")
+
     def _click_payment_button(self, wait: WebDriverWait) -> None:
-        """결제 버튼을 클릭합니다. CSS 우선, 실패 시 XPATH 폴백을 사용합니다."""
+        """결제 버튼을 클릭합니다. 오버레이 회피 로직을 포함합니다."""
+        driver = wait._driver
+        btn = None
+        
+        # 버튼 찾기: CSS 우선, 실패 시 XPATH 폴백
         try:
             btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#con1 > div > div.btn-wrap02.mt-30.easyAfter > button")))
-            btn.click()
         except TimeoutException:
             btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[@id='con1']/div/div[3]/button")))
-            btn.click()
+        
+        if not btn:
+            raise TimeoutException("Payment button not found")
+        
+        # 버튼을 화면에 보이도록 스크롤
+        try:
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
+            time.sleep(0.5)
+        except Exception as e:
+            print(f"[Recharge] Scroll into view failed (non-critical): {e}")
+        
+        # 오버레이 제거 시도
+        self._dismiss_overlays(driver)
+        
+        # 일반 클릭 시도 (최대 3회 재시도)
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                btn.click()
+                print("[Recharge] Payment button clicked successfully")
+                return
+            except ElementClickInterceptedException as e:
+                print(f"[Recharge] Click intercepted (attempt {attempt}/{max_retries}): {e}")
+                if attempt < max_retries:
+                    self._dismiss_overlays(driver)
+                    time.sleep(0.5)
+                else:
+                    # 최종 폴백: JavaScript 클릭
+                    print("[Recharge] Falling back to JavaScript click")
+                    try:
+                        driver.execute_script("arguments[0].click();", btn)
+                        print("[Recharge] JavaScript click succeeded")
+                        return
+                    except Exception as js_err:
+                        print(f"[Recharge] JavaScript click also failed: {js_err}")
+                        raise ElementClickInterceptedException(
+                            f"Payment button not clickable after {max_retries} retries and JS fallback"
+                        ) from e
 
     def _switch_to_ecaccount_popup(self, driver: webdriver.Chrome, timeout_seconds: float = 10) -> None:
         """URL에 ecAccount.do가 포함된 팝업으로 전환합니다. 없으면 기존 창을 유지합니다."""
@@ -433,7 +497,12 @@ Output only the numeric array, nothing else — no explanations or text."},
                 traceback.print_exc()
 
             # 충전 팝업 열기
-            self._click_payment_button(wait)
+            try:
+                self._click_payment_button(wait)
+            except ElementClickInterceptedException as e:
+                print(f"[Recharge] Payment button click intercepted: {e}")
+                traceback.print_exc()
+                return {"status": "error", "error": f"payment button click intercepted: {e}"}
             self._switch_to_ecaccount_popup(driver)
 
             # 직접 클릭: 키패드 찾기 → 레이아웃 이미지 추출 → 키패드 배열 추론 → 키 이미지 정렬 → 비밀번호 클릭
