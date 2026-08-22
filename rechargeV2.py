@@ -187,14 +187,12 @@ class RechargeV2:
         api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
         # 하드코딩된 모델 목록 (필요 시 이 배열만 수정하세요)
         models: List[str] = [
-            # "x-ai/grok-4.1-fast",
-            "openrouter/healer-alpha",
-            # "google/gemini-2.0-flash-exp:free",
-            # "nvidia/nemotron-nano-12b-v2-vl:free",
-            "mistralai/mistral-small-3.1-24b-instruct:free",
-            "google/gemma-3-4b-it:free",
-            "google/gemma-3-12b-it:free",
-            "google/gemma-3-27b-it:free",
+            "stealth/ox-alpha",
+            "dots-studio/dots-3-note-preview:free",
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+            "nvidia/llama-nemotron-rerank-vl-1b-v2:free",
+            "google/gemma-4-26b-a4b-it:free",
+            "google/gemma-4-31b-it:free",
         ]
 
         if not api_key:
