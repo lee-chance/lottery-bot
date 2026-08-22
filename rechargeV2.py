@@ -5,6 +5,7 @@ import time
 import base64
 from typing import List, Optional
 from selenium.webdriver.remote.webelement import WebElement
+from pathlib import Path
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -36,6 +37,10 @@ class RechargeV2:
             self._headless = headless_env not in ("0", "false", "no")
         else:
             self._headless = bool(headless)
+        
+        self._debug_dir = Path("debug")
+        self._debug_dir.mkdir(exist_ok=True)
+        self._screenshot_counter = 0
 
     def _create_driver(self) -> webdriver.Chrome:
         """Chrome WebDriver를 생성하고 공통 옵션을 적용합니다."""
@@ -46,6 +51,125 @@ class RechargeV2:
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         return webdriver.Chrome(options=chrome_options)
+
+    def _save_debug_screenshot(self, driver: webdriver.Chrome, step_name: str) -> None:
+        """디버그 스크린샷을 저장합니다."""
+        try:
+            self._screenshot_counter += 1
+            filename = f"recharge-debug-{self._screenshot_counter:02d}-{step_name}.png"
+            filepath = self._debug_dir / filename
+            driver.save_screenshot(str(filepath))
+            print(f"[Recharge Debug] Screenshot saved: {filepath}")
+        except Exception as e:
+            print(f"[Recharge Debug] Failed to save screenshot for {step_name}: {e}")
+
+    def _log_window_and_iframe_info(self, driver: webdriver.Chrome, context: str) -> None:
+        """현재 윈도우와 iframe 정보를 로깅합니다."""
+        try:
+            print(f"[Recharge Debug] === {context} ===")
+            print(f"[Recharge Debug] Current URL: {driver.current_url}")
+            print(f"[Recharge Debug] Window handles: {driver.window_handles}")
+            print(f"[Recharge Debug] Current handle: {driver.current_window_handle}")
+            
+            iframes = driver.find_elements(By.TAG_NAME, "iframe")
+            print(f"[Recharge Debug] Iframe count: {len(iframes)}")
+            for idx, iframe in enumerate(iframes):
+                iframe_src = iframe.get_attribute("src") or "(no src)"
+                iframe_id = iframe.get_attribute("id") or "(no id)"
+                print(f"[Recharge Debug] Iframe {idx}: id={iframe_id}, src={iframe_src}")
+        except Exception as e:
+            print(f"[Recharge Debug] Failed to log window/iframe info for {context}: {e}")
+
+    def _check_element_presence(self, driver: webdriver.Chrome, selectors: List[str]) -> None:
+        """지정된 selector들의 존재 여부를 로깅합니다."""
+        try:
+            print("[Recharge Debug] Checking element presence:")
+            for selector in selectors:
+                try:
+                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        visible_count = sum(1 for el in elements if el.is_displayed())
+                        print(f"[Recharge Debug]   {selector}: {len(elements)} found ({visible_count} visible)")
+                    else:
+                        print(f"[Recharge Debug]   {selector}: NOT FOUND")
+                except Exception:
+                    print(f"[Recharge Debug]   {selector}: ERROR checking")
+        except Exception as e:
+            print(f"[Recharge Debug] Failed to check element presence: {e}")
+
+    def _check_text_presence(self, driver: webdriver.Chrome, texts: List[str]) -> None:
+        """페이지 내 특정 텍스트의 존재 여부를 로깅합니다."""
+        try:
+            page_source = driver.page_source
+            print("[Recharge Debug] Checking text presence:")
+            for text in texts:
+                present = text in page_source
+                print(f"[Recharge Debug]   '{text}': {'PRESENT' if present else 'NOT FOUND'}")
+        except Exception as e:
+            print(f"[Recharge Debug] Failed to check text presence: {e}")
+
+    def _wait_for_alert_with_extended_matching(self, wait: WebDriverWait) -> tuple:
+        """
+        확장된 매칭 조건으로 alert를 기다립니다.
+        
+        반환: (matched_selector, alert_text, is_success)
+        - matched_selector: 매칭된 selector 또는 "text_match"
+        - alert_text: alert 텍스트 내용
+        - is_success: 성공 메시지 여부
+        """
+        driver = wait._driver
+        selectors_to_try = [
+            "#msgPop_1 > div.pop-up > div > div.pop-body",
+            "#msgPop_1 .pop-body",
+            ".pop-body",
+            ".modal-body",
+            "[class*='popup'] [class*='body']",
+            "[class*='alert'] [class*='body']",
+        ]
+        
+        success_keywords = ["예치금 충전이 완료되었습니다"]
+        failure_keywords = ["간편충전 비밀번호", "입력 실패", "오류"]
+        relevant_keywords = ["알림", "예치금 충전", "간편충전"]
+        
+        start_time = time.time()
+        timeout = wait._timeout
+        
+        while time.time() - start_time < timeout:
+            for selector in selectors_to_try:
+                try:
+                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    for el in elements:
+                        if not el.is_displayed():
+                            continue
+                        alert_text = el.text.strip()
+                        if not alert_text:
+                            continue
+                        
+                        has_relevant = any(kw in alert_text for kw in relevant_keywords)
+                        if has_relevant or len(alert_text) > 10:
+                            print(f"[Recharge Debug] Found visible alert via selector '{selector}': {alert_text}")
+                            is_success = any(kw in alert_text for kw in success_keywords)
+                            return (selector, alert_text, is_success)
+                except Exception:
+                    continue
+            
+            try:
+                visible_text_elements = driver.find_elements(By.XPATH, "//*[contains(text(), '알림') or contains(text(), '예치금') or contains(text(), '간편충전')]")
+                for el in visible_text_elements:
+                    if not el.is_displayed():
+                        continue
+                    alert_text = el.text.strip()
+                    if alert_text:
+                        print(f"[Recharge Debug] Found visible alert via text matching: {alert_text}")
+                        is_success = any(kw in alert_text for kw in success_keywords)
+                        return ("text_match", alert_text, is_success)
+            except Exception:
+                pass
+            
+            time.sleep(0.2)
+        
+        print("[Recharge Debug] Timeout waiting for alert with extended matching")
+        return (None, None, False)
 
     def _login(self, wait: WebDriverWait, username: str, password: str) -> None:
         """로그인 페이지로 이동하고 ID/PW 입력 후 로그인 버튼을 클릭합니다."""
@@ -497,54 +621,102 @@ Output only the numeric array, nothing else — no explanations or text."},
             # 충전 팝업 열기
             try:
                 self._click_payment_button(wait)
+                print("[Recharge Debug] Payment button clicked")
+                self._save_debug_screenshot(driver, "after-payment-click")
+                self._log_window_and_iframe_info(driver, "After Payment Click")
             except ElementClickInterceptedException as e:
                 print(f"[Recharge] Payment button click intercepted: {e}")
                 traceback.print_exc()
+                self._save_debug_screenshot(driver, "payment-click-failed")
                 return {"status": "error", "error": f"payment button click intercepted: {e}"}
+            
             self._switch_to_ecaccount_popup(driver)
+            self._save_debug_screenshot(driver, "after-popup-switch")
+            self._log_window_and_iframe_info(driver, "After Popup Switch")
 
             # 직접 클릭: 키패드 찾기 → 레이아웃 이미지 추출 → 키패드 배열 추론 → 키 이미지 정렬 → 비밀번호 클릭
             try:
                 keypad = self._find_keypad_element(wait)
+                print("[Recharge Debug] Keypad element found")
+                self._save_debug_screenshot(driver, "after-keypad-found")
+                
                 layout_img_src = self._extract_layout_image_as_base64(driver, keypad)
                 if not layout_img_src:
                     print("[Recharge] Skipping keypad layout inference: layout image extraction failed after all retries")
+                    self._save_debug_screenshot(driver, "keypad-extraction-failed")
                     return {"status": "error", "error": "layout image extraction failed"}
                 keypad_layout = self._infer_keypad_layout_via_openrouter(layout_img_src)
                 if keypad_layout is None:
                     print("[Recharge] Skipping keypad clicking due to missing or invalid keypad layout")
+                    self._save_debug_screenshot(driver, "keypad-inference-failed")
                     return {"status": "error", "error": "missing or invalid keypad layout"}
+                
                 key_imgs_sorted = self._get_sorted_key_images(keypad)
+                account_password_digits = ''.join(c for c in account_password if c.isdigit())
+                print(f"[Recharge Debug] ACCOUNT_PASSWORD digit count: {len(account_password_digits)} (NOT the value)")
+                print(f"[Recharge Debug] Will click {len(account_password_digits)} keys")
+                
                 self._click_password_sequence(wait, key_imgs_sorted, keypad_layout, account_password)
+                print("[Recharge Debug] Password sequence clicked")
+                self._save_debug_screenshot(driver, "after-pin-clicks")
             except Exception as e:
                 print(f"[Recharge] Keypad clicking failed: {e}")
                 traceback.print_exc()
+                self._save_debug_screenshot(driver, "keypad-clicking-failed")
                 return {"status": "error", "error": f"keypad clicking failed: {e}"}
 
             # 충전 성공 확인
-            current_url = driver.current_url if driver else None
-            print(f"[Recharge] Current page URL: {current_url}")
+            print("[Recharge Debug] Waiting for alert popup...")
+            time.sleep(2)
+            
+            self._log_window_and_iframe_info(driver, "Before Alert Wait")
+            self._check_element_presence(driver, [
+                "#msgPop_1",
+                "#msgPop_1 .pop-body",
+                ".pop-body",
+                ".modal-body",
+                "[class*='popup']",
+                "[class*='alert']",
+            ])
+            self._check_text_presence(driver, ["알림", "간편충전", "예치금 충전"])
             
             try:
-                alert_body = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#msgPop_1 > div.pop-up > div > div.pop-body")))
-                alert_text = alert_body.text
-                print(f"[Recharge] Alert text: {alert_text}")
-            except TimeoutException:
-                print("[Recharge] Timeout waiting for alert popup")
-                return {"status": "error", "error": "timeout waiting for alert popup"}
-
-            if current_url and "/mypage/mndpChrg" in current_url:
-                print("[Recharge] Detected /mypage/mndpChrg domain in URL.")
-                if "예치금 충전이 완료되었습니다." in alert_text:
+                matched_selector, alert_text, is_success = self._wait_for_alert_with_extended_matching(wait)
+                
+                self._save_debug_screenshot(driver, "after-alert-wait")
+                
+                if matched_selector is None:
+                    print("[Recharge Debug] No alert found after extended matching")
+                    
+                    try:
+                        visible_modals = driver.find_elements(By.CSS_SELECTOR, "[class*='modal'], [class*='popup'], [class*='alert']")
+                        for idx, modal in enumerate(visible_modals):
+                            if modal.is_displayed():
+                                modal_text = modal.text.strip()
+                                print(f"[Recharge Debug] Visible modal {idx} text: {modal_text}")
+                    except Exception as e:
+                        print(f"[Recharge Debug] Failed to check visible modals: {e}")
+                    
+                    return {"status": "error", "error": "timeout waiting for alert popup"}
+                
+                print(f"[Recharge Debug] Alert matched via: {matched_selector}")
+                print(f"[Recharge Debug] Alert text: {alert_text}")
+                
+                current_url = driver.current_url if driver else None
+                print(f"[Recharge] Current page URL: {current_url}")
+                
+                if is_success:
                     print("[Recharge] Recharge successful")
                     return {"status": "success", "amount": amount}
                 else:
                     print(f"[Recharge] Recharge failed: {alert_text}")
                     return {"status": "error", "error": alert_text}
-            else:
-                print(f"[Recharge] Unexpected URL: {current_url}")
-                print(f"[Recharge] Recharge failed: {alert_text}")
-                return {"status": "error", "error": alert_text}
+                    
+            except Exception as e:
+                print(f"[Recharge Debug] Exception during alert wait: {e}")
+                traceback.print_exc()
+                self._save_debug_screenshot(driver, "alert-wait-exception")
+                return {"status": "error", "error": f"alert wait exception: {e}"}
             
         except Exception as e:
             print(f"[Recharge] Exception during recharge flow: {e}")
